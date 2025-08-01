@@ -8,4 +8,3 @@ optimizer_runs = 200
 # Fluent Network configuration
 [rpc_endpoints]
 fluent = "https://rpc.testnet.fluent.xyz"
-
