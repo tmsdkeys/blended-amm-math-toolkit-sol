@@ -13,12 +13,15 @@ mathematical-amm-toolkit/
 │   ├── EnhancedAMM.sol           # Blended execution AMM
 │   └── IMathematicalEngine.sol   # Rust engine interface
 ├── rust-contracts/
-│   └── lib.rs                    # Rust mathematical engine
+│   ├── src/
+│   │   └── lib.rs                # Rust mathematical engine
+│   └── Cargo.toml                # Rust dependencies
 ├── script/
 │   └── Deploy.s.sol              # Deployment script
 ├── test/
 │   └── GasBenchmark.t.sol        # Comprehensive gas testing
 ├── foundry.toml                  # Project configuration
+├── deploy_rust.sh                # Rust deployment script
 └── run_benchmarks.sh             # Automated benchmarking
 ```
 
