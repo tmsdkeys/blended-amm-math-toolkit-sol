@@ -50,6 +50,8 @@ pub struct MathematicalEngine<SDK> {
     sdk: SDK,
 }
 
+// Thomas: I think we might need to import alloy solidity types and use them here
+
 pub trait MathematicalEngineAPI<SDK> {
     fn calculate_precise_square_root(&self, value: u64) -> u64;
     fn calculate_precise_slippage(&self, params: SlippageParams) -> u64;
@@ -58,6 +60,8 @@ pub trait MathematicalEngineAPI<SDK> {
     fn find_optimal_route(&self, hops: Vec<RouteHop>, amountIn: u64) -> (Vec<u32>, u64);
     fn calculate_lp_tokens(&self, params: LiquidityParams) -> u64;
 }
+
+// Thomas: I think we cannot use f64, not even as an intermediate step. Also we need to use the libm sqrt method
 
 #[router(mode = "solidity")]
 impl<SDK: SharedAPI> MathematicalEngineAPI<SDK> for MathematicalEngine<SDK> {

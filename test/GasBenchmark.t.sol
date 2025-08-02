@@ -19,7 +19,7 @@ contract GasBenchmark is Test {
     EnhancedAMM public enhancedAMM;
     MockERC20 public tokenA;
     MockERC20 public tokenB;
-    MockMathEngine public mathEngine;
+    IMathematicalEngine public mathEngine;
     
     // Test accounts
     address public alice = address(0x1);
@@ -48,7 +48,9 @@ contract GasBenchmark is Test {
         // Deploy contracts
         tokenA = new MockERC20("Token A", "TKNA");
         tokenB = new MockERC20("Token B", "TKNB");
-        mathEngine = new MockMathEngine();
+        
+        // Get the Rust math engine address from deployment
+        mathEngine = IMathematicalEngine(_getRustEngineAddress());
         
         basicAMM = new BasicAMM(
             address(tokenA),
@@ -393,5 +395,18 @@ contract GasBenchmark is Test {
         }
         
         console.log("================================");
+    }
+    
+    // ============ Helper Functions ============
+    
+    function _getRustEngineAddress() internal returns (address) {
+        // Read the Rust engine address from deployment artifact
+        try vm.readFile("rust_engine_address.txt") returns (string memory addressStr) {
+            return vm.parseAddress(addressStr);
+        } catch {
+            // For testing, we can skip if the Rust engine isn't deployed
+            console.log("Warning: Rust engine not found, tests may fail");
+            return address(0);
+        }
     }
 }
