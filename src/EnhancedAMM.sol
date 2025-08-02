@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./IMathematicalEngine.sol";
 
 /**
  * @title EnhancedAMM
@@ -25,7 +26,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
     uint256 public baseFeeRate = 30; // 0.3% in basis points
     
     // Rust mathematical engine integration
-    address public immutable mathEngine;
+    IMathematicalEngine public immutable mathEngine;
     
     // Enhanced features state
     bool public dynamicFeesEnabled = true;
@@ -37,34 +38,6 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
     uint256 public lastEnhancedLiquidityGasUsed;
     uint256 public lastBasicSwapGasUsed;
     uint256 public lastBasicLiquidityGasUsed;
-    
-    // ============ Structs for Rust Integration ============
-    
-    struct SwapParams {
-        uint256 amountIn;
-        uint256 reserveIn;
-        uint256 reserveOut;
-        uint256 feeRate;
-    }
-    
-    struct SlippageParams {
-        uint256 amountIn;
-        uint256 reserveIn;
-        uint256 reserveOut;
-        uint256 expectedOut;
-    }
-    
-    struct LiquidityParams {
-        uint256 amount0;
-        uint256 amount1;
-        uint256 totalSupply;
-    }
-    
-    struct VolatilityParams {
-        uint256 volume24h;
-        uint256 liquidityDepth;
-        uint256 priceVolatility;
-    }
     
     // ============ Events ============
     
@@ -94,6 +67,13 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         bool usedRustEngine
     );
     
+    event LiquidityRemoved(
+        address indexed provider,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 liquidity
+    );
+    
     event DynamicFeeUpdated(uint256 newFee, string reason);
     event GasComparisonRecorded(string operation, uint256 basicGas, uint256 enhancedGas);
     
@@ -112,7 +92,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         
         token0 = IERC20(_token0);
         token1 = IERC20(_token1);
-        mathEngine = _mathEngine;
+        mathEngine = IMathematicalEngine(_mathEngine);
         lastVolumeUpdate = block.timestamp;
     }
     
@@ -144,17 +124,17 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         // Use Rust engine for precise LP token calculation
         if (totalSupply() == 0) {
             // First liquidity provider - use Rust square root
-            liquidity = _callRustSquareRoot(amount0 * amount1) - MINIMUM_LIQUIDITY;
+            liquidity = mathEngine.calculatePreciseSquareRoot(amount0 * amount1) - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
             // Use Rust engine for precise calculation
-            LiquidityParams memory params = LiquidityParams({
+            IMathematicalEngine.LiquidityParams memory params = IMathematicalEngine.LiquidityParams({
                 amount0: amount0,
                 amount1: amount1,
                 totalSupply: totalSupply()
             });
             
-            liquidity = _callRustLPCalculation(params);
+            liquidity = mathEngine.calculateLPTokens(params);
         }
         
         require(liquidity > 0, "Insufficient liquidity minted");
@@ -166,6 +146,86 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         
         lastEnhancedLiquidityGasUsed = gasStart - gasleft();
         emit LiquidityAddedEnhanced(to, amount0, amount1, liquidity, true);
+    }
+    
+    /**
+     * @dev Remove liquidity using Rust-powered precise calculations
+     */
+    function removeLiquidityEnhanced(
+        uint256 liquidity,
+        uint256 amount0Min,
+        uint256 amount1Min,
+        address to
+    ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
+        uint256 gasStart = gasleft();
+        
+        require(liquidity > 0, "Insufficient liquidity");
+        
+        // Use Rust engine for precise calculation
+        uint256 _totalSupply = totalSupply();
+        
+        // High-precision calculation using Rust
+        amount0 = mathEngine.calculatePreciseSquareRoot((liquidity * reserve0 * liquidity) / _totalSupply) * reserve0 / liquidity;
+        amount1 = mathEngine.calculatePreciseSquareRoot((liquidity * reserve1 * liquidity) / _totalSupply) * reserve1 / liquidity;
+        
+        // Fallback to standard calculation if needed
+        if (amount0 == 0 || amount1 == 0) {
+            amount0 = (liquidity * reserve0) / _totalSupply;
+            amount1 = (liquidity * reserve1) / _totalSupply;
+        }
+        
+        require(amount0 >= amount0Min, "Insufficient amount0");
+        require(amount1 >= amount1Min, "Insufficient amount1");
+        
+        // Burn liquidity tokens
+        _burn(msg.sender, liquidity);
+        
+        // Transfer tokens back
+        token0.transfer(to, amount0);
+        token1.transfer(to, amount1);
+        
+        // Update reserves
+        reserve0 -= amount0;
+        reserve1 -= amount1;
+        
+        uint256 gasUsed = gasStart - gasleft();
+        emit LiquidityRemoved(to, amount0, amount1, liquidity);
+    }
+    
+    /**
+     * @dev Basic liquidity removal for comparison
+     */
+    function removeLiquidityBasic(
+        uint256 liquidity,
+        uint256 amount0Min,
+        uint256 amount1Min,
+        address to
+    ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
+        uint256 gasStart = gasleft();
+        
+        require(liquidity > 0, "Insufficient liquidity");
+        
+        // Calculate amounts to return using basic Solidity
+        uint256 _totalSupply = totalSupply();
+        amount0 = (liquidity * reserve0) / _totalSupply;
+        amount1 = (liquidity * reserve1) / _totalSupply;
+        
+        require(amount0 >= amount0Min, "Insufficient amount0");
+        require(amount1 >= amount1Min, "Insufficient amount1");
+        
+        // Burn liquidity tokens
+        _burn(msg.sender, liquidity);
+        
+        // Transfer tokens back
+        token0.transfer(to, amount0);
+        token1.transfer(to, amount1);
+        
+        // Update reserves
+        reserve0 -= amount0;
+        reserve1 -= amount1;
+        
+        uint256 gasUsed = gasStart - gasleft();
+        emit LiquidityRemoved(to, amount0, amount1, liquidity);
     }
     
     /**
@@ -243,14 +303,14 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 dynamicFee = dynamicFeesEnabled ? _getDynamicFee() : baseFeeRate;
         
         // Calculate optimized swap amount using Rust
-        SwapParams memory swapParams = SwapParams({
+        IMathematicalEngine.SwapParams memory swapParams = IMathematicalEngine.SwapParams({
             amountIn: amountIn,
             reserveIn: reserveIn,
             reserveOut: reserveOut,
             feeRate: dynamicFee
         });
         
-        uint256 optimizedAmountIn = _callRustSwapOptimization(swapParams);
+        uint256 optimizedAmountIn = mathEngine.optimizeSwapAmount(swapParams);
         amountOut = _getAmountOutEnhanced(optimizedAmountIn, reserveIn, reserveOut, dynamicFee);
         
         require(amountOut >= amountOutMin, "Insufficient output amount");
@@ -323,58 +383,21 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         }
     }
     
-    // ============ Rust Integration Functions ============
-    
-    /**
-     * @dev Call Rust engine for precise square root calculation
-     */
-    function _callRustSquareRoot(uint256 value) internal returns (uint256) {
-        bytes memory data = abi.encodeWithSignature("calculatePreciseSquareRoot(uint256)", value);
-        (bool success, bytes memory returnData) = mathEngine.call(data);
-        require(success, "Rust square root call failed");
-        return abi.decode(returnData, (uint256));
-    }
-    
-    /**
-     * @dev Call Rust engine for LP token calculation
-     */
-    function _callRustLPCalculation(LiquidityParams memory params) internal returns (uint256) {
-        bytes memory data = abi.encodeWithSignature("calculateLPTokens((uint256,uint256,uint256))", params);
-        (bool success, bytes memory returnData) = mathEngine.call(data);
-        require(success, "Rust LP calculation call failed");
-        return abi.decode(returnData, (uint256));
-    }
-    
-    /**
-     * @dev Call Rust engine for swap optimization
-     */
-    function _callRustSwapOptimization(SwapParams memory params) internal returns (uint256) {
-        bytes memory data = abi.encodeWithSignature("optimizeSwapAmount((uint256,uint256,uint256,uint256))", params);
-        (bool success, bytes memory returnData) = mathEngine.call(data);
-        require(success, "Rust swap optimization call failed");
-        return abi.decode(returnData, (uint256));
-    }
+    // ============ Enhanced Mathematical Functions ============
     
     /**
      * @dev Get dynamic fee from Rust engine
      */
     function _getDynamicFee() internal returns (uint256) {
-        VolatilityParams memory params = VolatilityParams({
+        IMathematicalEngine.VolatilityParams memory params = IMathematicalEngine.VolatilityParams({
             volume24h: volume24h,
             liquidityDepth: reserve0 + reserve1, // Simplified liquidity measure
             priceVolatility: _calculateSimpleVolatility()
         });
         
-        bytes memory data = abi.encodeWithSignature("calculateDynamicFee((uint256,uint256,uint256))", params);
-        (bool success, bytes memory returnData) = mathEngine.call(data);
-        
-        if (success) {
-            uint256 dynamicFee = abi.decode(returnData, (uint256));
-            emit DynamicFeeUpdated(dynamicFee, "Rust engine calculation");
-            return dynamicFee;
-        } else {
-            return baseFeeRate; // Fallback to base fee
-        }
+        uint256 dynamicFee = mathEngine.calculateDynamicFee(params);
+        emit DynamicFeeUpdated(dynamicFee, "Rust engine calculation");
+        return dynamicFee;
     }
     
     /**
@@ -388,24 +411,15 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
     ) internal returns (uint256) {
         uint256 expectedOut = (amountIn * reserveOut) / reserveIn; // Ideal price
         
-        SlippageParams memory params = SlippageParams({
+        IMathematicalEngine.SlippageParams memory params = IMathematicalEngine.SlippageParams({
             amountIn: amountIn,
             reserveIn: reserveIn,
             reserveOut: reserveOut,
             expectedOut: expectedOut
         });
         
-        bytes memory data = abi.encodeWithSignature("calculatePreciseSlippage((uint256,uint256,uint256,uint256))", params);
-        (bool success, bytes memory returnData) = mathEngine.call(data);
-        
-        if (success) {
-            return abi.decode(returnData, (uint256));
-        } else {
-            return 0; // Fallback
-        }
+        return mathEngine.calculatePreciseSlippage(params);
     }
-    
-    // ============ Enhanced Mathematical Functions ============
     
     /**
      * @dev Enhanced amount calculation with dynamic fees
