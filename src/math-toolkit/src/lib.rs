@@ -2,7 +2,6 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use alloy_sol_types::sol;
 use fluentbase_sdk::{
     basic_entrypoint,
     codec::Codec,
