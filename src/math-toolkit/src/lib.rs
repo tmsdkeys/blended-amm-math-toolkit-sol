@@ -5,49 +5,53 @@ use alloc::vec::Vec;
 use alloy_sol_types::sol;
 use fluentbase_sdk::{
     basic_entrypoint,
-    derive::{function_id, router, Contract},
-    Address, SharedAPI, I256, U256,
+    codec::Codec,
+    derive::{router, Contract},
+    Address, SharedAPI, U256,
 };
 
 // External crate for no_std mathematical functions
 extern crate libm;
 
-// ============ Solidity Type Definitions ============
+// ============ Rust Type Definitions ============
 
-sol! {
-    struct SwapParams {
-        uint256 amountIn;
-        uint256 reserveIn;
-        uint256 reserveOut;
-        uint256 feeRate;
-    }
+#[derive(Codec, Debug, Default, PartialEq, Clone)]
+pub struct SwapParams {
+    amount_in: U256,
+    reserve_in: U256,
+    reserve_out: U256,
+    fee_rate: U256,
+}
 
-    struct SlippageParams {
-        uint256 amountIn;
-        uint256 reserveIn;
-        uint256 reserveOut;
-        uint256 expectedOut;
-    }
+#[derive(Codec, Debug, Default, PartialEq, Clone)]
+pub struct SlippageParams {
+    amount_in: U256,
+    reserve_in: U256,
+    reserve_out: U256,
+    expected_out: U256,
+}
 
-    struct LiquidityParams {
-        uint256 amount0;
-        uint256 amount1;
-        uint256 totalSupply;
-    }
+#[derive(Codec, Debug, Default, PartialEq, Clone)]
+pub struct LiquidityParams {
+    amount0: U256,
+    amount1: U256,
+    total_supply: U256,
+}
 
-    struct RouteHop {
-        address pool;
-        address tokenIn;
-        address tokenOut;
-        uint256 reserveIn;
-        uint256 reserveOut;
-    }
+#[derive(Codec, Debug, Default, PartialEq, Clone)]
+pub struct RouteHop {
+    pool: Address,
+    token_in: Address,
+    token_out: Address,
+    reserve_in: U256,
+    reserve_out: U256,
+}
 
-    struct VolatilityParams {
-        uint256 volume24h;
-        uint256 liquidityDepth;
-        uint256 priceVolatility; // Scaled by 1e6
-    }
+#[derive(Codec, Debug, Default, PartialEq, Clone)]
+pub struct VolatilityParams {
+    volume24h: U256,
+    liquidity_depth: U256,
+    price_volatility: U256, // Scaled by 1e6
 }
 
 // ============ Fixed-Point Arithmetic Constants ============
@@ -98,10 +102,10 @@ impl<SDK: SharedAPI> MathematicalEngineAPI<SDK> for MathematicalEngine<SDK> {
     /// Eliminates precision loss from Solidity integer division
     #[function_id("calculatePreciseSlippage((uint256,uint256,uint256,uint256))")]
     fn calculate_precise_slippage(&self, params: SlippageParams) -> U256 {
-        let amount_in = params.amountIn.to::<u128>();
-        let reserve_in = params.reserveIn.to::<u128>();
-        let reserve_out = params.reserveOut.to::<u128>();
-        let expected_out = params.expectedOut.to::<u128>();
+        let amount_in = params.amount_in.to::<u128>();
+        let reserve_in = params.reserve_in.to::<u128>();
+        let reserve_out = params.reserve_out.to::<u128>();
+        let expected_out = params.expected_out.to::<u128>();
 
         if reserve_in == 0 || expected_out == 0 {
             return U256::ZERO;
@@ -124,8 +128,8 @@ impl<SDK: SharedAPI> MathematicalEngineAPI<SDK> for MathematicalEngine<SDK> {
     #[function_id("calculateDynamicFee((uint256,uint256,uint256))")]
     fn calculate_dynamic_fee(&self, params: VolatilityParams) -> U256 {
         let volume = params.volume24h.to::<u128>();
-        let liquidity = params.liquidityDepth.to::<u128>();
-        let volatility = params.priceVolatility.to::<u128>();
+        let liquidity = params.liquidity_depth.to::<u128>();
+        let volatility = params.price_volatility.to::<u128>();
 
         // Base fee: 30 basis points (0.3%)
         let base_fee = 30u128;
@@ -155,10 +159,10 @@ impl<SDK: SharedAPI> MathematicalEngineAPI<SDK> for MathematicalEngine<SDK> {
     /// Finds optimal input that minimizes price impact
     #[function_id("optimizeSwapAmount((uint256,uint256,uint256,uint256))")]
     fn optimize_swap_amount(&self, params: SwapParams) -> U256 {
-        let amount_in = params.amountIn.to::<u128>();
-        let reserve_in = params.reserveIn.to::<u128>();
-        let reserve_out = params.reserveOut.to::<u128>();
-        let fee_rate = params.feeRate.to::<u128>();
+        let amount_in = params.amount_in.to::<u128>();
+        let reserve_in = params.reserve_in.to::<u128>();
+        let reserve_out = params.reserve_out.to::<u128>();
+        let fee_rate = params.fee_rate.to::<u128>();
 
         // Calculate optimal input using derivative of constant product formula
         // Optimal point where marginal price impact is minimized
@@ -192,8 +196,8 @@ impl<SDK: SharedAPI> MathematicalEngineAPI<SDK> for MathematicalEngine<SDK> {
 
         // Try direct routes first (single hop)
         for (i, hop) in hops.iter().enumerate() {
-            let reserve_in = hop.reserveIn.to::<u128>();
-            let reserve_out = hop.reserveOut.to::<u128>();
+            let reserve_in = hop.reserve_in.to::<u128>();
+            let reserve_out = hop.reserve_out.to::<u128>();
 
             if reserve_in > 0 && reserve_out > 0 {
                 let output =
@@ -212,15 +216,15 @@ impl<SDK: SharedAPI> MathematicalEngineAPI<SDK> for MathematicalEngine<SDK> {
                     if i != j {
                         let intermediate = self.calculate_constant_product_output(
                             amount,
-                            hops[i].reserveIn.to::<u128>(),
-                            hops[i].reserveOut.to::<u128>(),
+                            hops[i].reserve_in.to::<u128>(),
+                            hops[i].reserve_out.to::<u128>(),
                         );
 
                         if intermediate > 0 {
                             let final_output = self.calculate_constant_product_output(
                                 intermediate,
-                                hops[j].reserveIn.to::<u128>(),
-                                hops[j].reserveOut.to::<u128>(),
+                                hops[j].reserve_in.to::<u128>(),
+                                hops[j].reserve_out.to::<u128>(),
                             );
 
                             if final_output > best_output {
@@ -242,7 +246,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI<SDK> for MathematicalEngine<SDK> {
     fn calculate_lp_tokens(&self, params: LiquidityParams) -> U256 {
         let amount0 = params.amount0.to::<u128>();
         let amount1 = params.amount1.to::<u128>();
-        let total_supply = params.totalSupply.to::<u128>();
+        let total_supply = params.total_supply.to::<u128>();
 
         if total_supply == 0 {
             // First liquidity provider - use high-precision geometric mean
@@ -452,9 +456,7 @@ impl<SDK: SharedAPI> MathematicalEngine<SDK> {
 // ============ Entry Point ============
 
 impl<SDK: SharedAPI> MathematicalEngine<SDK> {
-    pub fn deploy(sdk: SDK) -> Self {
-        Self { sdk }
-    }
+    pub fn deploy(&self) {}
 }
 
 basic_entrypoint!(MathematicalEngine);
