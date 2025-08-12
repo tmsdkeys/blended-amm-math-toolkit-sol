@@ -51,8 +51,8 @@ The Enhanced AMM leverages Rust for computationally expensive operations, demons
 git clone <repository-url>
 cd mathematical-amm-toolkit
 
-# Install dependencies
-make install
+# Initialize and update forge dependencies
+make setup
 ```
 
 ### Build & Deploy
@@ -61,13 +61,11 @@ make install
 # Build all contracts (Rust + Solidity)
 make build
 
-# Deploy everything to local network
-make anvil  # In one terminal
-make deploy # In another terminal
-
-# Or deploy to Fluent testnet
+# Deploy to Fluent testnet
 make deploy  # Uses RPC from foundry.toml
 ```
+
+Note: You need to have a `$PRIVATE_KEY` environment variable set. (Use .env file for this).
 
 ### Run Benchmarks
 

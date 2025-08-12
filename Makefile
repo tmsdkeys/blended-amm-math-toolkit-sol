@@ -13,17 +13,15 @@ help: ## Show this help message
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
 
-.PHONY: install
-install: ## Install dependencies
-	@echo "$(BLUE)Installing dependencies...$(NC)"
-	forge install foundry-rs/forge-std
-	forge install OpenZeppelin/openzeppelin-contracts
+.PHONY: setup
+setup: ## Initialize and update submodules
+	@echo "$(BLUE)Setting up submodules...$(NC)"
+	git submodule update --init --recursive
 
 .PHONY: clean
 clean: ## Clean build artifacts
 	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
-	forge clean
-	cd rust-contracts && cargo clean
+	gblend clean
 
 .PHONY: build
 build: ## Build all contracts (Rust and Solidity)
@@ -44,6 +42,7 @@ deploy-rust: build ## Deploy the Rust mathematical engine standalone
 	@echo "$(BLUE)Deploying Rust mathematical engine...$(NC)"
 	gblend create MathematicalEngine.wasm \
 		--rpc-url fluent-testnet \
+		--private-key $PRIVATE_KEY \
 		--broadcast
 	@echo "$(GREEN)✓ Math Engine deployed$(NC)"
 
@@ -52,6 +51,7 @@ deploy-amm: build ## Deploy AMM contracts standalone
 	@echo "$(BLUE)Deploying Basic AMM...$(NC)"
 	gblend create src/BasicAMM.sol:BasicAMM \
 		--rpc-url fluent-testnet \
+		--private-key $PRIVATE_KEY \
 		--broadcast \
 		--constructor-args $$(cast abi-encode "constructor(address,address,string,string)" \
 			0x0000000000000000000000000000000000000001 \
@@ -62,6 +62,7 @@ deploy-amm: build ## Deploy AMM contracts standalone
 	@echo "$(BLUE)Deploying Enhanced AMM...$(NC)"
 	gblend create src/EnhancedAMM.sol:EnhancedAMM \
 		--rpc-url fluent-testnet \
+		--private-key $PRIVATE_KEY \
 		--broadcast \
 		--constructor-args $$(cast abi-encode "constructor(address,address,address,string,string)" \
 			0x0000000000000000000000000000000000000001 \
@@ -75,6 +76,7 @@ deploy: build ## Deploy all contracts using the deployment script
 	@echo "$(BLUE)Deploying all contracts via script...$(NC)"
 	gblend script script/Deploy.s.sol:Deploy \
 		--rpc-url fluent-testnet \
+		--private-key $PRIVATE_KEY \
 		--broadcast \
 		-vvv
 	@echo "$(GREEN)✓ All contracts deployed$(NC)"

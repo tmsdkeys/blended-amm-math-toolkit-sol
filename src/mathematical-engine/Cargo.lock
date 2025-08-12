@@ -1593,7 +1593,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "math-toolkit"
+name = "mathematical-engine"
 version = "0.1.0"
 dependencies = [
  "fluentbase-sdk",
