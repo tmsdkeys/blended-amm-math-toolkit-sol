@@ -5,15 +5,14 @@ import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {BasicAMM} from "../src/BasicAMM.sol";
 import {EnhancedAMM} from "../src/EnhancedAMM.sol";
-import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
 
 contract Deploy is Script {
     // Deployment addresses
     address public tokenA;
     address public tokenB;
     address public mathEngine;
-    address public basicAMM;
-    address public enhancedAMM;
+    address public basicAmm;
+    address public enhancedAmm;
     
     function run() external {
         // Start broadcasting transactions
@@ -27,23 +26,23 @@ contract Deploy is Script {
         mathEngine = deployMathEngine();
         
         // Step 3: Deploy Basic AMM (pure Solidity baseline)
-        basicAMM = address(new BasicAMM(
+        basicAmm = address(new BasicAMM(
             tokenA,
             tokenB,
             "Basic AMM LP",
             "BASIC-LP"
         ));
-        console.log("Basic AMM deployed at:", basicAMM);
+        console.log("Basic AMM deployed at:", basicAmm);
         
         // Step 4: Deploy Enhanced AMM (with Rust math engine)
-        enhancedAMM = address(new EnhancedAMM(
+        enhancedAmm = address(new EnhancedAMM(
             tokenA,
             tokenB,
             mathEngine,
             "Enhanced AMM LP",
             "ENHANCED-LP"
         ));
-        console.log("Enhanced AMM deployed at:", enhancedAMM);
+        console.log("Enhanced AMM deployed at:", enhancedAmm);
         
         // Step 5: Save deployment addresses for testing
         saveDeploymentAddresses();
@@ -54,8 +53,8 @@ contract Deploy is Script {
         console.log("Token A:", tokenA);
         console.log("Token B:", tokenB);
         console.log("Math Engine:", mathEngine);
-        console.log("Basic AMM:", basicAMM);
-        console.log("Enhanced AMM:", enhancedAMM);
+        console.log("Basic AMM:", basicAmm);
+        console.log("Enhanced AMM:", enhancedAmm);
     }
     
     function deployTokenA() internal returns (address) {
@@ -86,18 +85,14 @@ contract Deploy is Script {
         return deployed;
     }
     
-    function salt() internal view returns (bytes32) {
-        return keccak256(abi.encode(msg.sender, block.timestamp));
-    }
-    
     function saveDeploymentAddresses() internal {
         // Save to a JSON file for easy access in tests
         string memory json = "deployment";
         vm.serializeAddress(json, "tokenA", tokenA);
         vm.serializeAddress(json, "tokenB", tokenB);
         vm.serializeAddress(json, "mathEngine", mathEngine);
-        vm.serializeAddress(json, "basicAMM", basicAMM);
-        string memory finalJson = vm.serializeAddress(json, "enhancedAMM", enhancedAMM);
+        vm.serializeAddress(json, "basicAMM", basicAmm);
+        string memory finalJson = vm.serializeAddress(json, "enhancedAMM", enhancedAmm);
         
         vm.writeJson(finalJson, "./deployment.json");
         console.log("Deployment addresses saved to deployment.json");

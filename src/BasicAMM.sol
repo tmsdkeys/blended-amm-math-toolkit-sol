@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title BasicAMM
@@ -16,8 +16,8 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
     
     // ============ State Variables ============
     
-    IERC20 public immutable token0;
-    IERC20 public immutable token1;
+    IERC20 public immutable TOKEN0;
+    IERC20 public immutable TOKEN1;
     
     uint256 public reserve0;
     uint256 public reserve1;
@@ -66,8 +66,8 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         require(_token0 != _token1, "Identical tokens");
         require(_token0 != address(0) && _token1 != address(0), "Zero address");
         
-        token0 = IERC20(_token0);
-        token1 = IERC20(_token1);
+        TOKEN0 = IERC20(_token0);
+        TOKEN1 = IERC20(_token1);
     }
     
     // ============ Core AMM Functions ============
@@ -93,8 +93,8 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         );
         
         // Transfer tokens
-        token0.transferFrom(msg.sender, address(this), amount0);
-        token1.transferFrom(msg.sender, address(this), amount1);
+        TOKEN0.transferFrom(msg.sender, address(this), amount0);
+        TOKEN1.transferFrom(msg.sender, address(this), amount1);
         
         // Calculate liquidity tokens to mint
         if (totalSupply() == 0) {
@@ -146,8 +146,8 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         _burn(msg.sender, liquidity);
         
         // Transfer tokens back
-        token0.transfer(to, amount0);
-        token1.transfer(to, amount1);
+        TOKEN0.transfer(to, amount0);
+        TOKEN1.transfer(to, amount1);
         
         // Update reserves
         reserve0 -= amount0;
@@ -171,9 +171,9 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 gasStart = gasleft();
         
         require(amountIn > 0, "Insufficient input amount");
-        require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
+        require(tokenIn == address(TOKEN0) || tokenIn == address(TOKEN1), "Invalid token");
         
-        bool isToken0 = tokenIn == address(token0);
+        bool isToken0 = tokenIn == address(TOKEN0);
         
         // Calculate output amount using constant product formula
         // amountOut = (amountIn * fee * reserveOut) / (reserveIn * 1000 + amountIn * fee)
@@ -188,18 +188,18 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         
         if (isToken0) {
-            token1.transfer(to, amountOut);
+            TOKEN1.transfer(to, amountOut);
             reserve0 += amountIn;
             reserve1 -= amountOut;
         } else {
-            token0.transfer(to, amountOut);
+            TOKEN0.transfer(to, amountOut);
             reserve1 += amountIn;
             reserve0 -= amountOut;
         }
         
         lastSwapGasUsed = gasStart - gasleft();
         emit GasUsageRecorded("swap", lastSwapGasUsed);
-        emit Swap(msg.sender, tokenIn, isToken0 ? address(token1) : address(token0), amountIn, amountOut);
+        emit Swap(msg.sender, tokenIn, isToken0 ? address(TOKEN1) : address(TOKEN0), amountIn, amountOut);
     }
     
     // ============ Mathematical Helper Functions ============

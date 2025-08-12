@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Test.sol";
-import "../src/BasicAMM.sol";
-import "../src/EnhancedAMM.sol";
-// Import the auto-generated interface
-import "../out/MathematicalEngine.wasm/interface.sol";
+import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
+import {BasicAMM} from "../src/BasicAMM.sol";
+import {EnhancedAMM} from "../src/EnhancedAMM.sol";
+import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
 
 contract GasBenchmarkTest is Test {
-    BasicAMM public basicAMM;
-    EnhancedAMM public enhancedAMM;
+    BasicAMM public basicAmm;
+    EnhancedAMM public enhancedAmm;
     IMathematicalEngine public mathEngine;
     
     address public tokenA;
@@ -32,8 +32,8 @@ contract GasBenchmarkTest is Test {
         mathEngine = IMathematicalEngine(deployMathEngine());
         
         // Deploy AMMs
-        basicAMM = new BasicAMM(tokenA, tokenB, "Basic LP", "BLP");
-        enhancedAMM = new EnhancedAMM(
+        basicAmm = new BasicAMM(tokenA, tokenB, "Basic LP", "BLP");
+        enhancedAmm = new EnhancedAMM(
             tokenA,
             tokenB,
             address(mathEngine),
@@ -61,10 +61,6 @@ contract GasBenchmarkTest is Test {
         return deployed;
     }
     
-    function salt() internal view returns (bytes32) {
-        return keccak256(abi.encode(address(this), block.timestamp));
-    }
-    
     function setupTestAccounts() internal {
         MockERC20(tokenA).mint(alice, INITIAL_LIQUIDITY * 10);
         MockERC20(tokenB).mint(alice, INITIAL_LIQUIDITY * 10);
@@ -73,17 +69,17 @@ contract GasBenchmarkTest is Test {
         
         // Approve AMMs
         vm.startPrank(alice);
-        MockERC20(tokenA).approve(address(basicAMM), type(uint256).max);
-        MockERC20(tokenB).approve(address(basicAMM), type(uint256).max);
-        MockERC20(tokenA).approve(address(enhancedAMM), type(uint256).max);
-        MockERC20(tokenB).approve(address(enhancedAMM), type(uint256).max);
+        MockERC20(tokenA).approve(address(basicAmm), type(uint256).max);
+        MockERC20(tokenB).approve(address(basicAmm), type(uint256).max);
+        MockERC20(tokenA).approve(address(enhancedAmm), type(uint256).max);
+        MockERC20(tokenB).approve(address(enhancedAmm), type(uint256).max);
         vm.stopPrank();
         
         vm.startPrank(bob);
-        MockERC20(tokenA).approve(address(basicAMM), type(uint256).max);
-        MockERC20(tokenB).approve(address(basicAMM), type(uint256).max);
-        MockERC20(tokenA).approve(address(enhancedAMM), type(uint256).max);
-        MockERC20(tokenB).approve(address(enhancedAMM), type(uint256).max);
+        MockERC20(tokenA).approve(address(basicAmm), type(uint256).max);
+        MockERC20(tokenB).approve(address(basicAmm), type(uint256).max);
+        MockERC20(tokenA).approve(address(enhancedAmm), type(uint256).max);
+        MockERC20(tokenB).approve(address(enhancedAmm), type(uint256).max);
         vm.stopPrank();
     }
     
@@ -94,12 +90,12 @@ contract GasBenchmarkTest is Test {
         
         // Measure Basic AMM
         uint256 gasStart = gasleft();
-        basicAMM.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        basicAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
         uint256 basicGas = gasStart - gasleft();
         
         // Measure Enhanced AMM
         gasStart = gasleft();
-        enhancedAMM.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        enhancedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
         uint256 enhancedGas = gasStart - gasleft();
         
         vm.stopPrank();
@@ -120,8 +116,8 @@ contract GasBenchmarkTest is Test {
     function testSwapGasComparison() public {
         // First add liquidity
         vm.startPrank(alice);
-        basicAMM.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
-        enhancedAMM.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        basicAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        enhancedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
         vm.stopPrank();
         
         console.log("\n=== Swap Gas Comparison ===");
@@ -130,12 +126,12 @@ contract GasBenchmarkTest is Test {
         
         // Measure Basic AMM swap
         uint256 gasStart = gasleft();
-        basicAMM.swap(tokenA, SWAP_AMOUNT, 0, bob);
+        basicAmm.swap(tokenA, SWAP_AMOUNT, 0, bob);
         uint256 basicGas = gasStart - gasleft();
         
         // Measure Enhanced AMM swap
         gasStart = gasleft();
-        enhancedAMM.swapEnhanced(tokenA, SWAP_AMOUNT, 0, bob);
+        enhancedAmm.swapEnhanced(tokenA, SWAP_AMOUNT, 0, bob);
         uint256 enhancedGas = gasStart - gasleft();
         
         vm.stopPrank();

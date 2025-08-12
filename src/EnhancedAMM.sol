@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 // Import the auto-generated interface from gblend
-import "../out/MathematicalEngine.wasm/interface.sol";
+import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
 
 /**
  * @title EnhancedAMM
@@ -17,8 +17,8 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
     
     // ============ State Variables ============
     
-    IERC20 public immutable token0;
-    IERC20 public immutable token1;
+    IERC20 public immutable TOKEN0;
+    IERC20 public immutable TOKEN1;
     
     uint256 public reserve0;
     uint256 public reserve1;
@@ -27,7 +27,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
     uint256 public baseFeeRate = 30; // 0.3% in basis points
     
     // Rust mathematical engine integration
-    IMathematicalEngine public immutable mathEngine;
+    IMathematicalEngine public immutable MATH_ENGINE;
     
     // Enhanced features state
     bool public dynamicFeesEnabled = true;
@@ -74,9 +74,9 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         require(_token0 != address(0) && _token1 != address(0), "Zero address");
         require(_mathEngine != address(0), "Invalid math engine");
         
-        token0 = IERC20(_token0);
-        token1 = IERC20(_token1);
-        mathEngine = IMathematicalEngine(_mathEngine);
+        TOKEN0 = IERC20(_token0);
+        TOKEN1 = IERC20(_token1);
+        MATH_ENGINE = IMathematicalEngine(_mathEngine);
         lastVolumeUpdate = block.timestamp;
     }
     
@@ -100,13 +100,13 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         );
         
         // Transfer tokens
-        token0.transferFrom(msg.sender, address(this), amount0);
-        token1.transferFrom(msg.sender, address(this), amount1);
+        TOKEN0.transferFrom(msg.sender, address(this), amount0);
+        TOKEN1.transferFrom(msg.sender, address(this), amount1);
         
         // Use Rust engine for precise LP token calculation
         if (totalSupply() == 0) {
             // First liquidity provider - use geometric mean via Rust
-            liquidity = mathEngine.calculateLpTokens(amount0, amount1);
+            liquidity = MATH_ENGINE.calculateLpTokens(amount0, amount1);
             
             // Ensure minimum liquidity
             require(liquidity > MINIMUM_LIQUIDITY, "Insufficient initial liquidity");
@@ -157,8 +157,8 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         reserve1 -= amount1;
         
         // Transfer tokens
-        token0.transfer(to, amount0);
-        token1.transfer(to, amount1);
+        TOKEN0.transfer(to, amount0);
+        TOKEN1.transfer(to, amount1);
         
         emit LiquidityRemoved(to, amount0, amount1, liquidity);
     }
@@ -175,9 +175,9 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         address to
     ) external nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0, "Insufficient input amount");
-        require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
+        require(tokenIn == address(TOKEN0) || tokenIn == address(TOKEN1), "Invalid token");
         
-        bool isToken0 = tokenIn == address(token0);
+        bool isToken0 = tokenIn == address(TOKEN0);
         (uint256 reserveIn, uint256 reserveOut) = isToken0 
             ? (reserve0, reserve1) 
             : (reserve1, reserve0);
@@ -195,18 +195,18 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         );
         
         // Calculate output using Rust engine
-        amountOut = mathEngine.calculatePreciseSlippage(slippageParams);
+        amountOut = MATH_ENGINE.calculatePreciseSlippage(slippageParams);
         require(amountOut >= amountOutMin, "Insufficient output amount");
         
         // Execute swap
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         
         if (isToken0) {
-            token1.transfer(to, amountOut);
+            TOKEN1.transfer(to, amountOut);
             reserve0 += amountIn;
             reserve1 -= amountOut;
         } else {
-            token0.transfer(to, amountOut);
+            TOKEN0.transfer(to, amountOut);
             reserve1 += amountIn;
             reserve0 -= amountOut;
         }
@@ -227,9 +227,9 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         address to
     ) external nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0, "Insufficient input amount");
-        require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
+        require(tokenIn == address(TOKEN0) || tokenIn == address(TOKEN1), "Invalid token");
         
-        bool isToken0 = tokenIn == address(token0);
+        bool isToken0 = tokenIn == address(TOKEN0);
         (uint256 reserveIn, uint256 reserveOut) = isToken0 
             ? (reserve0, reserve1) 
             : (reserve1, reserve0);
@@ -246,11 +246,11 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         
         if (isToken0) {
-            token1.transfer(to, amountOut);
+            TOKEN1.transfer(to, amountOut);
             reserve0 += amountIn;
             reserve1 -= amountOut;
         } else {
-            token0.transfer(to, amountOut);
+            TOKEN0.transfer(to, amountOut);
             reserve1 += amountIn;
             reserve0 -= amountOut;
         }
@@ -276,8 +276,8 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         );
         
         // Transfer tokens
-        token0.transferFrom(msg.sender, address(this), amount0);
-        token1.transferFrom(msg.sender, address(this), amount1);
+        TOKEN0.transferFrom(msg.sender, address(this), amount0);
+        TOKEN1.transferFrom(msg.sender, address(this), amount1);
         
         // Basic liquidity calculation
         if (totalSupply() == 0) {
@@ -326,8 +326,8 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         reserve1 -= amount1;
         
         // Transfer tokens
-        token0.transfer(to, amount0);
-        token1.transfer(to, amount1);
+        TOKEN0.transfer(to, amount0);
+        TOKEN1.transfer(to, amount1);
     }
     
     // ============ Helper Functions ============
@@ -342,7 +342,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
             reserve0 + reserve1
         );
         
-        uint256 dynamicFee = mathEngine.calculateDynamicFee(params);
+        uint256 dynamicFee = MATH_ENGINE.calculateDynamicFee(params);
         emit DynamicFeeUpdated(dynamicFee);
         return dynamicFee;
     }
@@ -414,7 +414,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 initialPrice,
         uint256 currentPrice
     ) external returns (uint256) {
-        return mathEngine.calculateImpermanentLoss(initialPrice, currentPrice);
+        return MATH_ENGINE.calculateImpermanentLoss(initialPrice, currentPrice);
     }
     
     /**
@@ -424,7 +424,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amountIn,
         address tokenIn
     ) external view returns (uint256) {
-        bool isToken0 = tokenIn == address(token0);
+        bool isToken0 = tokenIn == address(TOKEN0);
         (uint256 reserveIn, uint256 reserveOut) = isToken0 
             ? (reserve0, reserve1) 
             : (reserve1, reserve0);
