@@ -93,8 +93,8 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         );
         
         // Transfer tokens
-        TOKEN0.transferFrom(msg.sender, address(this), amount0);
-        TOKEN1.transferFrom(msg.sender, address(this), amount1);
+        require(TOKEN0.transferFrom(msg.sender, address(this), amount0), "TOKEN0 transfer failed");
+        require(TOKEN1.transferFrom(msg.sender, address(this), amount1), "TOKEN1 transfer failed");
         
         // Calculate liquidity tokens to mint
         if (totalSupply() == 0) {
@@ -146,8 +146,8 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         _burn(msg.sender, liquidity);
         
         // Transfer tokens back
-        TOKEN0.transfer(to, amount0);
-        TOKEN1.transfer(to, amount1);
+        require(TOKEN0.transfer(to, amount0), "TOKEN0 transfer failed");
+        require(TOKEN1.transfer(to, amount1), "TOKEN1 transfer failed");
         
         // Update reserves
         reserve0 -= amount0;
@@ -185,14 +185,14 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         require(amountOut >= amountOutMin, "Insufficient output amount");
         
         // Transfer tokens
-        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn), "Token transfer failed");
         
         if (isToken0) {
-            TOKEN1.transfer(to, amountOut);
+            require(TOKEN1.transfer(to, amountOut), "TOKEN1 transfer failed");
             reserve0 += amountIn;
             reserve1 -= amountOut;
         } else {
-            TOKEN0.transfer(to, amountOut);
+            require(TOKEN0.transfer(to, amountOut), "TOKEN0 transfer failed");
             reserve1 += amountIn;
             reserve0 -= amountOut;
         }
