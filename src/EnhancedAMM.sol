@@ -5,7 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./IMathematicalEngine.sol";
+// Import the auto-generated interface from gblend
+import "../out/MathematicalEngine.wasm/interface.sol";
 
 /**
  * @title EnhancedAMM
@@ -32,39 +33,23 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
     bool public dynamicFeesEnabled = true;
     uint256 public volume24h;
     uint256 public lastVolumeUpdate;
-    
-    // Gas tracking for benchmarking
-    uint256 public lastEnhancedSwapGasUsed;
-    uint256 public lastEnhancedLiquidityGasUsed;
-    uint256 public lastBasicSwapGasUsed;
-    uint256 public lastBasicLiquidityGasUsed;
+    uint256 public priceVolatility = 100; // Start at 100 basis points
     
     // ============ Events ============
     
     event SwapEnhanced(
         address indexed user,
         address indexed tokenIn,
-        address indexed tokenOut,
         uint256 amountIn,
         uint256 amountOut,
-        uint256 dynamicFee,
-        uint256 slippage
-    );
-    
-    event SwapBasic(
-        address indexed user,
-        address indexed tokenIn,
-        address indexed tokenOut,
-        uint256 amountIn,
-        uint256 amountOut
+        uint256 dynamicFee
     );
     
     event LiquidityAddedEnhanced(
         address indexed provider,
         uint256 amount0,
         uint256 amount1,
-        uint256 liquidity,
-        bool usedRustEngine
+        uint256 liquidity
     );
     
     event LiquidityRemoved(
@@ -74,8 +59,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 liquidity
     );
     
-    event DynamicFeeUpdated(uint256 newFee, string reason);
-    event GasComparisonRecorded(string operation, uint256 basicGas, uint256 enhancedGas);
+    event DynamicFeeUpdated(uint256 newFee);
     
     // ============ Constructor ============
     
@@ -108,8 +92,6 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amount1Min,
         address to
     ) external nonReentrant returns (uint256 liquidity) {
-        uint256 gasStart = gasleft();
-        
         (uint256 amount0, uint256 amount1) = _calculateOptimalAmounts(
             amount0Desired,
             amount1Desired,
@@ -123,18 +105,18 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         
         // Use Rust engine for precise LP token calculation
         if (totalSupply() == 0) {
-            // First liquidity provider - use Rust square root
-            liquidity = mathEngine.calculatePreciseSquareRoot(amount0 * amount1) - MINIMUM_LIQUIDITY;
-            _mint(address(0), MINIMUM_LIQUIDITY);
-        } else {
-            // Use Rust engine for precise calculation
-            IMathematicalEngine.LiquidityParams memory params = IMathematicalEngine.LiquidityParams({
-                amount0: amount0,
-                amount1: amount1,
-                totalSupply: totalSupply()
-            });
+            // First liquidity provider - use geometric mean via Rust
+            liquidity = mathEngine.calculateLpTokens(amount0, amount1);
             
-            liquidity = mathEngine.calculateLPTokens(params);
+            // Ensure minimum liquidity
+            require(liquidity > MINIMUM_LIQUIDITY, "Insufficient initial liquidity");
+            liquidity = liquidity - MINIMUM_LIQUIDITY;
+            _mint(address(0), MINIMUM_LIQUIDITY); // Lock minimum liquidity
+        } else {
+            // Calculate proportional liquidity
+            uint256 liquidity0 = (amount0 * totalSupply()) / reserve0;
+            uint256 liquidity1 = (amount1 * totalSupply()) / reserve1;
+            liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
         }
         
         require(liquidity > 0, "Insufficient liquidity minted");
@@ -144,12 +126,11 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         reserve0 += amount0;
         reserve1 += amount1;
         
-        lastEnhancedLiquidityGasUsed = gasStart - gasleft();
-        emit LiquidityAddedEnhanced(to, amount0, amount1, liquidity, true);
+        emit LiquidityAddedEnhanced(to, amount0, amount1, liquidity);
     }
     
     /**
-     * @dev Remove liquidity using Rust-powered precise calculations
+     * @dev Remove liquidity
      */
     function removeLiquidityEnhanced(
         uint256 liquidity,
@@ -157,89 +138,136 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amount1Min,
         address to
     ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
-        uint256 gasStart = gasleft();
-        
         require(liquidity > 0, "Insufficient liquidity");
         
-        // Use Rust engine for precise calculation
         uint256 _totalSupply = totalSupply();
         
-        // High-precision calculation using Rust
-        amount0 = mathEngine.calculatePreciseSquareRoot((liquidity * reserve0 * liquidity) / _totalSupply) * reserve0 / liquidity;
-        amount1 = mathEngine.calculatePreciseSquareRoot((liquidity * reserve1 * liquidity) / _totalSupply) * reserve1 / liquidity;
-        
-        // Fallback to standard calculation if needed
-        if (amount0 == 0 || amount1 == 0) {
-            amount0 = (liquidity * reserve0) / _totalSupply;
-            amount1 = (liquidity * reserve1) / _totalSupply;
-        }
-        
-        require(amount0 >= amount0Min, "Insufficient amount0");
-        require(amount1 >= amount1Min, "Insufficient amount1");
-        
-        // Burn liquidity tokens
-        _burn(msg.sender, liquidity);
-        
-        // Transfer tokens back
-        token0.transfer(to, amount0);
-        token1.transfer(to, amount1);
-        
-        // Update reserves
-        reserve0 -= amount0;
-        reserve1 -= amount1;
-        
-        uint256 gasUsed = gasStart - gasleft();
-        emit LiquidityRemoved(to, amount0, amount1, liquidity);
-    }
-    
-    /**
-     * @dev Basic liquidity removal for comparison
-     */
-    function removeLiquidityBasic(
-        uint256 liquidity,
-        uint256 amount0Min,
-        uint256 amount1Min,
-        address to
-    ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
-        uint256 gasStart = gasleft();
-        
-        require(liquidity > 0, "Insufficient liquidity");
-        
-        // Calculate amounts to return using basic Solidity
-        uint256 _totalSupply = totalSupply();
+        // Calculate amounts proportionally
         amount0 = (liquidity * reserve0) / _totalSupply;
         amount1 = (liquidity * reserve1) / _totalSupply;
         
         require(amount0 >= amount0Min, "Insufficient amount0");
         require(amount1 >= amount1Min, "Insufficient amount1");
         
-        // Burn liquidity tokens
+        // Burn LP tokens
         _burn(msg.sender, liquidity);
-        
-        // Transfer tokens back
-        token0.transfer(to, amount0);
-        token1.transfer(to, amount1);
         
         // Update reserves
         reserve0 -= amount0;
         reserve1 -= amount1;
         
-        uint256 gasUsed = gasStart - gasleft();
+        // Transfer tokens
+        token0.transfer(to, amount0);
+        token1.transfer(to, amount1);
+        
         emit LiquidityRemoved(to, amount0, amount1, liquidity);
     }
     
+    // ============ Enhanced Swap Functions ============
+    
     /**
-     * @dev Basic liquidity addition for comparison (original Solidity implementation)
+     * @dev Enhanced swap using Rust engine for optimization
      */
-    function addLiquidityBasic(
+    function swapEnhanced(
+        address tokenIn,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address to
+    ) external nonReentrant returns (uint256 amountOut) {
+        require(amountIn > 0, "Insufficient input amount");
+        require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
+        
+        bool isToken0 = tokenIn == address(token0);
+        (uint256 reserveIn, uint256 reserveOut) = isToken0 
+            ? (reserve0, reserve1) 
+            : (reserve1, reserve0);
+        
+        // Get dynamic fee if enabled
+        uint256 feeRate = dynamicFeesEnabled ? _getDynamicFee() : baseFeeRate;
+        
+        // For swap optimization, we could use the Rust engine's optimizeSwapAmount
+        // but for simplicity, we'll use the precise slippage calculation
+        IMathematicalEngine.SlippageParams memory slippageParams = IMathematicalEngine.SlippageParams({
+            amountIn: amountIn,
+            reserveIn: reserveIn,
+            reserveOut: reserveOut,
+            feeRate: feeRate
+        });
+        
+        // Calculate output using Rust engine
+        amountOut = mathEngine.calculatePreciseSlippage(slippageParams);
+        require(amountOut >= amountOutMin, "Insufficient output amount");
+        
+        // Execute swap
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        
+        if (isToken0) {
+            token1.transfer(to, amountOut);
+            reserve0 += amountIn;
+            reserve1 -= amountOut;
+        } else {
+            token0.transfer(to, amountOut);
+            reserve1 += amountIn;
+            reserve0 -= amountOut;
+        }
+        
+        // Update volume tracking
+        _updateVolume(amountIn);
+        
+        emit SwapEnhanced(msg.sender, tokenIn, amountIn, amountOut, feeRate);
+    }
+    
+    /**
+     * @dev Basic swap for comparison (pure Solidity)
+     */
+    function swap(
+        address tokenIn,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address to
+    ) external nonReentrant returns (uint256 amountOut) {
+        require(amountIn > 0, "Insufficient input amount");
+        require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
+        
+        bool isToken0 = tokenIn == address(token0);
+        (uint256 reserveIn, uint256 reserveOut) = isToken0 
+            ? (reserve0, reserve1) 
+            : (reserve1, reserve0);
+        
+        // Basic constant product formula
+        uint256 amountInWithFee = amountIn * (10000 - baseFeeRate);
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = reserveIn * 10000 + amountInWithFee;
+        amountOut = numerator / denominator;
+        
+        require(amountOut >= amountOutMin, "Insufficient output amount");
+        
+        // Execute swap
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        
+        if (isToken0) {
+            token1.transfer(to, amountOut);
+            reserve0 += amountIn;
+            reserve1 -= amountOut;
+        } else {
+            token0.transfer(to, amountOut);
+            reserve1 += amountIn;
+            reserve0 -= amountOut;
+        }
+    }
+    
+    // ============ Basic Liquidity Functions (for comparison) ============
+    
+    /**
+     * @dev Basic add liquidity for comparison
+     */
+    function addLiquidity(
         uint256 amount0Desired,
         uint256 amount1Desired,
         uint256 amount0Min,
         uint256 amount1Min,
         address to
     ) external nonReentrant returns (uint256 liquidity) {
-        uint256 gasStart = gasleft();
-        
         (uint256 amount0, uint256 amount1) = _calculateOptimalAmounts(
             amount0Desired,
             amount1Desired,
@@ -251,15 +279,15 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         token0.transferFrom(msg.sender, address(this), amount0);
         token1.transferFrom(msg.sender, address(this), amount1);
         
-        // Use basic Solidity square root
+        // Basic liquidity calculation
         if (totalSupply() == 0) {
+            // Use Babylonian square root (less efficient)
             liquidity = _sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            liquidity = _min(
-                (amount0 * totalSupply()) / reserve0,
-                (amount1 * totalSupply()) / reserve1
-            );
+            uint256 liquidity0 = (amount0 * totalSupply()) / reserve0;
+            uint256 liquidity1 = (amount1 * totalSupply()) / reserve1;
+            liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
         }
         
         require(liquidity > 0, "Insufficient liquidity minted");
@@ -268,230 +296,60 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         // Update reserves
         reserve0 += amount0;
         reserve1 += amount1;
-        
-        lastBasicLiquidityGasUsed = gasStart - gasleft();
-        emit LiquidityAddedEnhanced(to, amount0, amount1, liquidity, false);
-        
-        // Record gas comparison
-        if (lastEnhancedLiquidityGasUsed > 0) {
-            emit GasComparisonRecorded("addLiquidity", lastBasicLiquidityGasUsed, lastEnhancedLiquidityGasUsed);
-        }
-    }
-    
-    // ============ Enhanced Swap Functions ============
-    
-    /**
-     * @dev Execute enhanced swap with Rust optimizations
-     */
-    function swapEnhanced(
-        address tokenIn,
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address to
-    ) external nonReentrant returns (uint256 amountOut) {
-        uint256 gasStart = gasleft();
-        
-        require(amountIn > 0, "Insufficient input amount");
-        require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
-        
-        bool isToken0 = tokenIn == address(token0);
-        (uint256 reserveIn, uint256 reserveOut) = isToken0 
-            ? (reserve0, reserve1) 
-            : (reserve1, reserve0);
-        
-        // Get dynamic fee from Rust engine
-        uint256 dynamicFee = dynamicFeesEnabled ? _getDynamicFee() : baseFeeRate;
-        
-        // Calculate optimized swap amount using Rust
-        IMathematicalEngine.SwapParams memory swapParams = IMathematicalEngine.SwapParams({
-            amountIn: amountIn,
-            reserveIn: reserveIn,
-            reserveOut: reserveOut,
-            feeRate: dynamicFee
-        });
-        
-        uint256 optimizedAmountIn = mathEngine.optimizeSwapAmount(swapParams);
-        amountOut = _getAmountOutEnhanced(optimizedAmountIn, reserveIn, reserveOut, dynamicFee);
-        
-        require(amountOut >= amountOutMin, "Insufficient output amount");
-        
-        // Calculate precise slippage using Rust
-        uint256 slippage = _calculatePreciseSlippage(optimizedAmountIn, reserveIn, reserveOut, amountOut);
-        
-        // Execute swap
-        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
-        
-        if (isToken0) {
-            token1.transfer(to, amountOut);
-            reserve0 += amountIn;
-            reserve1 -= amountOut;
-        } else {
-            token0.transfer(to, amountOut);
-            reserve1 += amountIn;
-            reserve0 -= amountOut;
-        }
-        
-        // Update volume for dynamic fee calculation
-        _updateVolume(amountIn);
-        
-        lastEnhancedSwapGasUsed = gasStart - gasleft();
-        emit SwapEnhanced(msg.sender, tokenIn, isToken0 ? address(token1) : address(token0), 
-                         amountIn, amountOut, dynamicFee, slippage);
     }
     
     /**
-     * @dev Basic swap for comparison (original Solidity implementation)
+     * @dev Basic remove liquidity for comparison
      */
-    function swapBasic(
-        address tokenIn,
-        uint256 amountIn,
-        uint256 amountOutMin,
+    function removeLiquidity(
+        uint256 liquidity,
+        uint256 amount0Min,
+        uint256 amount1Min,
         address to
-    ) external nonReentrant returns (uint256 amountOut) {
-        uint256 gasStart = gasleft();
+    ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
+        require(liquidity > 0, "Insufficient liquidity");
         
-        require(amountIn > 0, "Insufficient input amount");
-        require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
+        uint256 _totalSupply = totalSupply();
         
-        bool isToken0 = tokenIn == address(token0);
-        (uint256 reserveIn, uint256 reserveOut) = isToken0 
-            ? (reserve0, reserve1) 
-            : (reserve1, reserve0);
-            
-        amountOut = _getAmountOut(amountIn, reserveIn, reserveOut);
-        require(amountOut >= amountOutMin, "Insufficient output amount");
+        // Calculate amounts
+        amount0 = (liquidity * reserve0) / _totalSupply;
+        amount1 = (liquidity * reserve1) / _totalSupply;
         
-        // Execute swap
-        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        require(amount0 >= amount0Min, "Insufficient amount0");
+        require(amount1 >= amount1Min, "Insufficient amount1");
         
-        if (isToken0) {
-            token1.transfer(to, amountOut);
-            reserve0 += amountIn;
-            reserve1 -= amountOut;
-        } else {
-            token0.transfer(to, amountOut);
-            reserve1 += amountIn;
-            reserve0 -= amountOut;
-        }
+        // Burn LP tokens
+        _burn(msg.sender, liquidity);
         
-        lastBasicSwapGasUsed = gasStart - gasleft();
-        emit SwapBasic(msg.sender, tokenIn, isToken0 ? address(token1) : address(token0), amountIn, amountOut);
+        // Update reserves
+        reserve0 -= amount0;
+        reserve1 -= amount1;
         
-        // Record gas comparison
-        if (lastEnhancedSwapGasUsed > 0) {
-            emit GasComparisonRecorded("swap", lastBasicSwapGasUsed, lastEnhancedSwapGasUsed);
-        }
+        // Transfer tokens
+        token0.transfer(to, amount0);
+        token1.transfer(to, amount1);
     }
     
-    // ============ Enhanced Mathematical Functions ============
+    // ============ Helper Functions ============
     
     /**
      * @dev Get dynamic fee from Rust engine
      */
     function _getDynamicFee() internal returns (uint256) {
-        IMathematicalEngine.VolatilityParams memory params = IMathematicalEngine.VolatilityParams({
+        IMathematicalEngine.DynamicFeeParams memory params = IMathematicalEngine.DynamicFeeParams({
+            volatility: priceVolatility,
             volume24h: volume24h,
-            liquidityDepth: reserve0 + reserve1, // Simplified liquidity measure
-            priceVolatility: _calculateSimpleVolatility()
+            liquidityDepth: reserve0 + reserve1
         });
         
         uint256 dynamicFee = mathEngine.calculateDynamicFee(params);
-        emit DynamicFeeUpdated(dynamicFee, "Rust engine calculation");
+        emit DynamicFeeUpdated(dynamicFee);
         return dynamicFee;
     }
     
     /**
-     * @dev Calculate precise slippage using Rust engine
+     * @dev Calculate optimal amounts for liquidity provision
      */
-    function _calculatePreciseSlippage(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut,
-        uint256 actualOut
-    ) internal returns (uint256) {
-        uint256 expectedOut = (amountIn * reserveOut) / reserveIn; // Ideal price
-        
-        IMathematicalEngine.SlippageParams memory params = IMathematicalEngine.SlippageParams({
-            amountIn: amountIn,
-            reserveIn: reserveIn,
-            reserveOut: reserveOut,
-            expectedOut: expectedOut
-        });
-        
-        return mathEngine.calculatePreciseSlippage(params);
-    }
-    
-    /**
-     * @dev Enhanced amount calculation with dynamic fees
-     */
-    function _getAmountOutEnhanced(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut,
-        uint256 feeRate
-    ) internal pure returns (uint256) {
-        require(amountIn > 0, "Insufficient input amount");
-        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
-        
-        uint256 amountInWithFee = amountIn * (10000 - feeRate);
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 10000) + amountInWithFee;
-        
-        return numerator / denominator;
-    }
-    
-    /**
-     * @dev Update 24h volume for dynamic fee calculation
-     */
-    function _updateVolume(uint256 tradeAmount) internal {
-        if (block.timestamp > lastVolumeUpdate + 24 hours) {
-            volume24h = tradeAmount; // Reset for new 24h period
-            lastVolumeUpdate = block.timestamp;
-        } else {
-            volume24h += tradeAmount;
-        }
-    }
-    
-    /**
-     * @dev Simple volatility calculation (for demo purposes)
-     */
-    function _calculateSimpleVolatility() internal view returns (uint256) {
-        // Simplified volatility based on reserve ratio changes
-        // In production, this would use price history
-        if (reserve0 == 0 || reserve1 == 0) return 0;
-        
-        uint256 ratio = (reserve0 * 1e6) / reserve1;
-        uint256 baseRatio = 1e6; // 1:1 ratio
-        
-        return ratio > baseRatio ? ratio - baseRatio : baseRatio - ratio;
-    }
-    
-    // ============ Fallback Solidity Functions ============
-    // These are used when Rust calls fail or for comparison
-    
-    function _sqrt(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-        uint256 z = (x + 1) / 2;
-        uint256 y = x;
-        while (z < y) {
-            y = z;
-            z = (x / z + z) / 2;
-        }
-        return y;
-    }
-    
-    function _getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) 
-        internal view returns (uint256) {
-        require(amountIn > 0, "Insufficient input amount");
-        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
-        
-        uint256 amountInWithFee = amountIn * 997;
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
-        
-        return numerator / denominator;
-    }
-    
     function _calculateOptimalAmounts(
         uint256 amount0Desired,
         uint256 amount1Desired,
@@ -499,59 +357,81 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amount1Min
     ) internal view returns (uint256 amount0, uint256 amount1) {
         if (reserve0 == 0 && reserve1 == 0) {
-            return (amount0Desired, amount1Desired);
-        }
-        
-        uint256 amount1Optimal = (amount0Desired * reserve1) / reserve0;
-        if (amount1Optimal <= amount1Desired) {
-            require(amount1Optimal >= amount1Min, "Insufficient amount1");
-            return (amount0Desired, amount1Optimal);
+            (amount0, amount1) = (amount0Desired, amount1Desired);
         } else {
-            uint256 amount0Optimal = (amount1Desired * reserve0) / reserve1;
-            require(amount0Optimal >= amount0Min, "Insufficient amount0");
-            return (amount0Optimal, amount1Desired);
+            uint256 amount1Optimal = (amount0Desired * reserve1) / reserve0;
+            if (amount1Optimal <= amount1Desired) {
+                require(amount1Optimal >= amount1Min, "Insufficient amount1");
+                (amount0, amount1) = (amount0Desired, amount1Optimal);
+            } else {
+                uint256 amount0Optimal = (amount1Desired * reserve0) / reserve1;
+                assert(amount0Optimal <= amount0Desired);
+                require(amount0Optimal >= amount0Min, "Insufficient amount0");
+                (amount0, amount1) = (amount0Optimal, amount1Desired);
+            }
         }
     }
     
-    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
+    /**
+     * @dev Update 24h volume tracking
+     */
+    function _updateVolume(uint256 amount) internal {
+        // Reset volume every 24 hours
+        if (block.timestamp > lastVolumeUpdate + 24 hours) {
+            volume24h = amount;
+            lastVolumeUpdate = block.timestamp;
+        } else {
+            volume24h += amount;
+        }
+    }
+    
+    /**
+     * @dev Babylonian square root (for comparison with Rust version)
+     */
+    function _sqrt(uint256 x) internal pure returns (uint256 y) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
     }
     
     // ============ View Functions ============
     
+    /**
+     * @dev Get current reserves
+     */
     function getReserves() external view returns (uint256, uint256) {
         return (reserve0, reserve1);
     }
     
-    function getGasMetrics() external view returns (
-        uint256 basicSwap,
-        uint256 enhancedSwap,
-        uint256 basicLiquidity,
-        uint256 enhancedLiquidity
-    ) {
-        return (lastBasicSwapGasUsed, lastEnhancedSwapGasUsed, 
-                lastBasicLiquidityGasUsed, lastEnhancedLiquidityGasUsed);
+    /**
+     * @dev Calculate impermanent loss using Rust engine
+     */
+    function calculateImpermanentLoss(
+        uint256 initialPrice,
+        uint256 currentPrice
+    ) external view returns (uint256) {
+        return mathEngine.calculateImpermanentLoss(initialPrice, currentPrice);
     }
     
-    function getCurrentDynamicFee() external view returns (uint256) {
-        return dynamicFeesEnabled ? baseFeeRate : baseFeeRate; // Simplified for view
-    }
-    
-    function getVolume24h() external view returns (uint256) {
-        return volume24h;
-    }
-    
-    // ============ Admin Functions ============
-    
-    function toggleDynamicFees() external onlyOwner {
-        dynamicFeesEnabled = !dynamicFeesEnabled;
-        emit DynamicFeeUpdated(dynamicFeesEnabled ? 0 : baseFeeRate, 
-                              dynamicFeesEnabled ? "Dynamic fees enabled" : "Dynamic fees disabled");
-    }
-    
-    function setBaseFeeRate(uint256 _baseFeeRate) external onlyOwner {
-        require(_baseFeeRate <= 100, "Fee too high"); // Max 1%
-        baseFeeRate = _baseFeeRate;
-        emit DynamicFeeUpdated(_baseFeeRate, "Base fee updated by admin");
+    /**
+     * @dev Preview swap output
+     */
+    function getAmountOut(
+        uint256 amountIn,
+        address tokenIn
+    ) external view returns (uint256) {
+        bool isToken0 = tokenIn == address(token0);
+        (uint256 reserveIn, uint256 reserveOut) = isToken0 
+            ? (reserve0, reserve1) 
+            : (reserve1, reserve0);
+        
+        uint256 amountInWithFee = amountIn * (10000 - baseFeeRate);
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = reserveIn * 10000 + amountInWithFee;
+        return numerator / denominator;
     }
 }
