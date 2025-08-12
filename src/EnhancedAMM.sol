@@ -187,12 +187,12 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
         
         // For swap optimization, we could use the Rust engine's optimizeSwapAmount
         // but for simplicity, we'll use the precise slippage calculation
-        IMathematicalEngine.SlippageParams memory slippageParams = IMathematicalEngine.SlippageParams({
-            amountIn: amountIn,
-            reserveIn: reserveIn,
-            reserveOut: reserveOut,
-            feeRate: feeRate
-        });
+        IMathematicalEngine.SlippageParams memory slippageParams = IMathematicalEngine.SlippageParams(
+            amountIn,
+            reserveIn,
+            reserveOut,
+            feeRate
+        );
         
         // Calculate output using Rust engine
         amountOut = mathEngine.calculatePreciseSlippage(slippageParams);
@@ -336,11 +336,11 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
      * @dev Get dynamic fee from Rust engine
      */
     function _getDynamicFee() internal returns (uint256) {
-        IMathematicalEngine.DynamicFeeParams memory params = IMathematicalEngine.DynamicFeeParams({
-            volatility: priceVolatility,
-            volume24h: volume24h,
-            liquidityDepth: reserve0 + reserve1
-        });
+        IMathematicalEngine.DynamicFeeParams memory params = IMathematicalEngine.DynamicFeeParams(
+            priceVolatility,
+            volume24h,
+            reserve0 + reserve1
+        );
         
         uint256 dynamicFee = mathEngine.calculateDynamicFee(params);
         emit DynamicFeeUpdated(dynamicFee);
@@ -413,7 +413,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
     function calculateImpermanentLoss(
         uint256 initialPrice,
         uint256 currentPrice
-    ) external view returns (uint256) {
+    ) external returns (uint256) {
         return mathEngine.calculateImpermanentLoss(initialPrice, currentPrice);
     }
     

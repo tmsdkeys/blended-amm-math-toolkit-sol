@@ -47,12 +47,12 @@ contract GasBenchmarkTest is Test {
     
     function deployMathEngine() internal returns (address) {
         // Read the WASM bytecode from the build artifact
-        bytes memory wasmBytecode = vm.readFileBinary("out/MathematicalEngine/MathematicalEngine.json");
+        bytes memory wasmBytecode = vm.readFileBinary("out/MathematicalEngine.wasm/MathematicalEngine.wasm");
         
         // Deploy the WASM contract
         address deployed;
         assembly {
-            deployed := create2(0, add(wasmBytecode, 0x20), mload(wasmBytecode), salt())
+            deployed := create2(0, add(wasmBytecode, 0x20), mload(wasmBytecode), 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef)
         }
         
         require(deployed != address(0), "Failed to deploy Math Engine");
@@ -161,11 +161,11 @@ contract GasBenchmarkTest is Test {
         console.log("Gas used:", sqrtGas);
         
         // Test dynamic fee calculation
-        IMathematicalEngine.DynamicFeeParams memory feeParams = IMathematicalEngine.DynamicFeeParams({
-            volatility: 200, // 200 basis points
-            volume24h: 1000 * 1e18,
-            liquidityDepth: 100000 * 1e18
-        });
+        IMathematicalEngine.DynamicFeeParams memory feeParams = IMathematicalEngine.DynamicFeeParams(
+            200, // volatility: 200 basis points
+            1000 * 1e18, // volume24h
+            100000 * 1e18 // liquidityDepth
+        );
         
         gasStart = gasleft();
         uint256 dynamicFee = mathEngine.calculateDynamicFee(feeParams);

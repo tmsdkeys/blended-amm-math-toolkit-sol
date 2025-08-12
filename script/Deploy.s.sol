@@ -77,7 +77,7 @@ contract Deploy is Script {
         // Deploy the WASM contract
         address deployed;
         assembly {
-            deployed := create2(0, add(wasmBytecode, 0x20), mload(wasmBytecode), salt())
+            deployed := create2(0, add(wasmBytecode, 0x20), mload(wasmBytecode), 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef)
         }
         
         require(deployed != address(0), "Failed to deploy Math Engine");
