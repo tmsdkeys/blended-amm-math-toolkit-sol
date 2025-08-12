@@ -13,16 +13,6 @@ verbosity = 2
 gas_reports = ["*"]
 gas_snapshots = true
 
-# Gas benchmarking settings
-[gas_benchmark]
-enabled = true
-compare_threshold = 1000  # Gas difference threshold for reporting
-output_file = "gas_comparison.json"
-
 # RPC endpoints
 [rpc_endpoints]
 fluent-testnet = "https://rpc.testnet.fluent.xyz"
-
-# Etherscan/Blockscout configuration for verification
-[etherscan]
-fluent-testnet = { url = "https://blockscout.testnet.fluent.xyz/api" }
