@@ -83,6 +83,8 @@ make snapshot
 
 ### Gas Comparison
 
+TODO: Update with real reproducible numbers
+
 | Operation | Basic AMM (Solidity) | Enhanced AMM (Rust) | Savings |
 |-----------|---------------------|---------------------|---------|
 | Square Root | ~20,000 gas | ~2,000 gas | **90%** |
