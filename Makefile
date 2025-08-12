@@ -16,8 +16,8 @@ help: ## Show this help message
 .PHONY: install
 install: ## Install dependencies
 	@echo "$(BLUE)Installing dependencies...$(NC)"
-	forge install foundry-rs/forge-std --no-commit
-	forge install OpenZeppelin/openzeppelin-contracts --no-commit
+	forge install foundry-rs/forge-std
+	forge install OpenZeppelin/openzeppelin-contracts
 
 .PHONY: clean
 clean: ## Clean build artifacts
