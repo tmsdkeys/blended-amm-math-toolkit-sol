@@ -13,27 +13,6 @@ verbosity = 2
 gas_reports = ["*"]
 gas_snapshots = true
 
-# Blended execution specific settings
-[profile.blended]
-src = "src"
-rust_src = "math-toolkit/src"
-out = "out"
-libs = ["lib"]
-
-# Use gblend instead of forge for blended contracts
-[build]
-via_ir = true
-optimizer = true
-
+# RPC endpoints
 [rpc_endpoints]
-local = "http://127.0.0.1:8545"
-fluent_testnet = "https://rpc.dev.fluentlabs.xyz"
-
-[etherscan]
-fluent_testnet = { key = "${FLUENT_API_KEY}", url = "https://blockscout.dev.fluentlabs.xyz/api" }
-
-# Gas benchmarking settings
-[gas_benchmark]
-enabled = true
-compare_threshold = 1000  # Gas difference threshold for reporting
-output_file = "gas_comparison.json"
+fluent-testnet = "https://rpc.testnet.fluent.xyz"
