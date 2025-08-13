@@ -53,11 +53,7 @@ deploy-amm: build ## Deploy AMM contracts standalone
 		--rpc-url fluent-testnet \
 		--private-key $PRIVATE_KEY \
 		--broadcast \
-		--constructor-args $$(cast abi-encode "constructor(address,address,string,string)" \
-			$TOKEN_A \
-			$TOKEN_B \
-			"Basic AMM LP Token" \
-			"BAMM-LP")
+		--constructor-args $TOKEN_A $TOKEN_B "Basic AMM LP Token" "BAMM-LP"
 	@echo "$(GREEN)✓ Basic AMM deployed$(NC)"
 	
 	@echo "$(BLUE)Deploying Enhanced AMM...$(NC)"
@@ -65,12 +61,12 @@ deploy-amm: build ## Deploy AMM contracts standalone
 		--rpc-url fluent-testnet \
 		--private-key $PRIVATE_KEY \
 		--broadcast \
-		--constructor-args $$(cast abi-encode "constructor(address,address,address,string,string)" \
+		--constructor-args \
 			$TOKEN_A \
 			$TOKEN_B \
 			$MATH_ENGINE \
 			"Enhanced AMM LP Token" \
-			"EAMM-LP")
+			"EAMM-LP"
 	@echo "$(GREEN)✓ Enhanced AMM deployed$(NC)"
 
 .PHONY: deploy
