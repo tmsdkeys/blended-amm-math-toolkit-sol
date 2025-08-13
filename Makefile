@@ -54,9 +54,10 @@ deploy-amm: build ## Deploy AMM contracts standalone
 		--private-key $PRIVATE_KEY \
 		--broadcast \
 		--constructor-args $$(cast abi-encode "constructor(address,address,string,string)" \
-			0x0000000000000000000000000000000000000001 \
-			0x0000000000000000000000000000000000000002 \
-			"Basic LP" "BLP")
+			$TOKEN_A \
+			$TOKEN_B \
+			"Basic AMM LP Token" \
+			"BAMM-LP")
 	@echo "$(GREEN)✓ Basic AMM deployed$(NC)"
 	
 	@echo "$(BLUE)Deploying Enhanced AMM...$(NC)"
@@ -65,10 +66,11 @@ deploy-amm: build ## Deploy AMM contracts standalone
 		--private-key $PRIVATE_KEY \
 		--broadcast \
 		--constructor-args $$(cast abi-encode "constructor(address,address,address,string,string)" \
-			0x0000000000000000000000000000000000000001 \
-			0x0000000000000000000000000000000000000002 \
-			0x0000000000000000000000000000000000000003 \
-			"Enhanced LP" "ELP")
+			$TOKEN_A \
+			$TOKEN_B \
+			$MATH_ENGINE \
+			"Enhanced AMM LP Token" \
+			"EAMM-LP")
 	@echo "$(GREEN)✓ Enhanced AMM deployed$(NC)"
 
 .PHONY: deploy
