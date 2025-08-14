@@ -15,8 +15,8 @@ const CONFIG = {
     tokenA: "0xcB340aB3c8e00886C5DBF09328D50af6D40B9EEb",
     tokenB: "0x8108c36844Faf04C091973E95aE2B725cdCb55cC",
     mathEngine: "0x43aD2ef2fA35F2DE88E0E137429b8f6F4AeD65a2",
-    basicAMM: "0xa8cD34c8bE2E492E607fc33eD092f0A81c830E06",
-    enhancedAMM: "0x2952949E6A76e3865B0bf78a07d45411985185f8",
+    basicAMM: "0x1f9483387E54577aAD7E8145E99d38D4722eaCFD",
+    enhancedAMM: "0x3Ac977b824042344324C16bc0EA4B02396d94417",
   },
 
   // Test amounts
@@ -25,7 +25,7 @@ const CONFIG = {
   TEST_TOKENS_PER_USER: ethers.utils.parseEther("5000"), // 5k tokens per user
 
   // Your private key (set this as environment variable)
-  privateKey: "",
+  privateKey: process.env.PRIVATE_KEY || "your-private-key-here",
 };
 
 // Helper function to load ABI from build artifacts
