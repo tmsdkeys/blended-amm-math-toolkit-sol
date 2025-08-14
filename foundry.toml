@@ -2,6 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+fs_permissions = [{ access = "read", path = "./deployments/testnet.json" }]
 
 # Optimizer settings for accurate gas measurements
 optimizer = true
@@ -12,6 +13,13 @@ via_ir = true
 verbosity = 2
 gas_reports = ["*"]
 gas_snapshots = true
+
+# Remappings for cleaner imports
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
+]
 
 # RPC endpoints
 [rpc_endpoints]

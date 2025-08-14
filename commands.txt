@@ -1,0 +1,27 @@
+forge create src/BasicAMM.sol:BasicAMM \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --constructor-args $TOKEN_A $TOKEN_B "Basic AMM LP Token" "BAMM-LP"
+
+forge create src/EnhancedAMM.sol:EnhancedAMM \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --constructor-args $TOKEN_A $TOKEN_B $MATH_ENGINE "EnhancedAMM-LPToken" "EAMM-LP" 
+
+forge verify-contract $BASIC_AMM BasicAMM \
+    --verifier blockscout \
+    --verifier-url https://testnet.fluentscan.xyz/api/ \
+    --constructor-args $(cast abi-encode "constructor(address,address,string,string)" $TOKEN_A $TOKEN_B "Basic AMM LP Token" "BAMM-LP")
+
+forge verify-contract $ENHANCED_AMM src/EnhancedAMM.sol:EnhancedAMM \
+    --verifier blockscout \
+    --verifier-url https://testnet.fluentscan.xyz/api/ \
+    --constructor-args $(cast abi-encode "constructor(address,address,address,string,string)" $TOKEN_A $TOKEN_B $MATH_ENGINE "EnhancedAMM-LPToken" "EAMM-LP")
+
+gblend script script/Bootstrap.s.sol:Bootstrap \
+    --rpc-url fluent-testnet \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    -vvv   

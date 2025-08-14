@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {BasicAMM} from "../src/BasicAMM.sol";
 import {EnhancedAMM} from "../src/EnhancedAMM.sol";
-import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
+import {IMathematicalEngine} from "../src/IMathematicalEngine.sol";
 
 contract GasBenchmarkTest is Test {
     BasicAMM public basicAmm;

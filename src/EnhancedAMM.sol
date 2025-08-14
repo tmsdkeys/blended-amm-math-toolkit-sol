@@ -6,7 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 // Import the auto-generated interface from gblend
-import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
+import {IMathematicalEngine} from "./IMathematicalEngine.sol";
 
 /**
  * @title EnhancedAMM
