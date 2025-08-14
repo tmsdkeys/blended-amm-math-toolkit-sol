@@ -16,3 +16,5 @@ docs/
 **/target/
 
 temp/
+
+**/node_modules/

@@ -1,0 +1,173 @@
+[
+  {
+    "name": "calculatePreciseSquareRoot",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "value"
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "_0"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "name": "calculatePreciseSlippage",
+    "inputs": [
+      {
+        "internalType": "struct SlippageParams",
+        "type": "tuple",
+        "name": "params",
+        "components": []
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "_0"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "name": "calculateDynamicFee",
+    "inputs": [
+      {
+        "internalType": "struct DynamicFeeParams",
+        "type": "tuple",
+        "name": "params",
+        "components": []
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "_0"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "name": "optimizeSwapAmount",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "total_amount"
+      },
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "reserve_in"
+      },
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "reserve_out"
+      },
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "fee_rate"
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "struct OptimizationResult",
+        "type": "tuple",
+        "name": "_0",
+        "components": []
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "name": "calculateLpTokens",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "amount0"
+      },
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "amount1"
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "_0"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "name": "calculateImpermanentLoss",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "initial_price"
+      },
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "current_price"
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "_0"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "name": "findOptimalRoute",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "amount_in"
+      },
+      {
+        "internalType": "tuple[]",
+        "type": "tuple[]",
+        "name": "pools"
+      },
+      {
+        "internalType": "uint256[]",
+        "type": "uint256[]",
+        "name": "fee_rates"
+      }
+    ],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "type": "uint256",
+        "name": "_0"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

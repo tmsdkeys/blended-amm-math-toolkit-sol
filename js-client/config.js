@@ -1,4 +1,9 @@
+// Load environment variables from .env file
+require("dotenv").config();
+
 const ethers = require("ethers");
+const fs = require("fs");
+const path = require("path");
 
 // Configuration
 const CONFIG = {
@@ -15,13 +20,33 @@ const CONFIG = {
   },
 
   // Test amounts
-  INITIAL_LIQUIDITY: ethers.utils.parseEther("10000"), // 10k tokens
+  INITIAL_LIQUIDITY: ethers.utils.parseEther("1000"), // 1k tokens (reduced from 10k)
   SWAP_AMOUNT: ethers.utils.parseEther("100"), // 100 tokens
   TEST_TOKENS_PER_USER: ethers.utils.parseEther("5000"), // 5k tokens per user
 
   // Your private key (set this as environment variable)
-  privateKey: process.env.PRIVATE_KEY || "your-private-key-here",
+  privateKey: "",
 };
+
+// Helper function to load ABI from build artifacts
+function loadABI(contractName) {
+  try {
+    const artifactPath = path.join(
+      __dirname,
+      "..",
+      "out",
+      `${contractName}.sol`,
+      `${contractName}.json`
+    );
+    const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+    return artifact.abi;
+  } catch (error) {
+    console.warn(
+      `Warning: Could not load ABI for ${contractName}: ${error.message}`
+    );
+    return [];
+  }
+}
 
 // Create provider
 const provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcURL);
@@ -29,52 +54,22 @@ const provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcURL);
 // Create wallet
 const wallet = new ethers.Wallet(CONFIG.privateKey, provider);
 
-// ABI definitions
-const ERC20_ABI = [
-  "function balanceOf(address owner) view returns (uint256)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function mint(address to, uint256 amount)",
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)",
-];
+// Load ABIs from build artifacts
+const ERC20_ABI = loadABI("ERC20");
+const BASIC_AMM_ABI = loadABI("BasicAMM");
+const ENHANCED_AMM_ABI = loadABI("EnhancedAMM");
 
-const BASIC_AMM_ABI = [
-  "function addLiquidity(uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address to) returns (uint256 liquidity)",
-  "function removeLiquidity(uint256 liquidity, uint256 amount0Min, uint256 amount1Min, address to) returns (uint256 amount0, uint256 amount1)",
-  "function swap(address tokenIn, uint256 amountIn, uint256 amountOutMin, address to) returns (uint256 amountOut)",
-  "function getReserves() view returns (uint256, uint256)",
-  "function balanceOf(address owner) view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function calculateSlippage(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) view returns (uint256)",
-  "function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) view returns (uint256)",
-];
-
-const ENHANCED_AMM_ABI = [
-  "function addLiquidityEnhanced(uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address to) returns (uint256 liquidity)",
-  "function removeLiquidityEnhanced(uint256 liquidity, uint256 amount0Min, uint256 amount1Min, address to) returns (uint256 amount0, uint256 amount1)",
-  "function swapEnhanced(address tokenIn, uint256 amountIn, uint256 amountOutMin, address to) returns (uint256 amountOut)",
-  "function swap(address tokenIn, uint256 amountIn, uint256 amountOutMin, address to) returns (uint256 amountOut)",
-  "function addLiquidity(uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address to) returns (uint256 liquidity)",
-  "function removeLiquidity(uint256 liquidity, uint256 amount0Min, uint256 amount1Min, address to) returns (uint256 amount0, uint256 amount1)",
-  "function getReserves() view returns (uint256, uint256)",
-  "function balanceOf(address owner) view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function calculateImpermanentLoss(uint256 initialPrice, uint256 currentPrice) returns (uint256)",
-  "function getAmountOut(uint256 amountIn, address tokenIn) view returns (uint256)",
-];
-
-const MATH_ENGINE_ABI = [
-  "function calculatePreciseSquareRoot(uint256 value) returns (uint256)",
-  "function calculatePreciseSlippage((uint256,uint256,uint256,uint256) params) returns (uint256)",
-  "function calculateDynamicFee((uint256,uint256,uint256) params) returns (uint256)",
-  "function optimizeSwapAmount(uint256 totalAmount, uint256 reserveIn, uint256 reserveOut, uint256 feeRate) returns ((uint256,uint256,uint256))",
-  "function calculateLpTokens(uint256 amount0, uint256 amount1) returns (uint256)",
-  "function calculateImpermanentLoss(uint256 initialPrice, uint256 currentPrice) returns (uint256)",
-  "function findOptimalRoute(uint256 amountIn, (uint256,uint256)[] pools, uint256[] feeRates) returns (uint256)",
-];
+// Load math engine ABI from root directory
+let MATH_ENGINE_ABI = [];
+try {
+  const mathEnginePath = path.join(__dirname, "..", "math-engine.json");
+  const mathEngineArtifact = JSON.parse(
+    fs.readFileSync(mathEnginePath, "utf8")
+  );
+  MATH_ENGINE_ABI = mathEngineArtifact.abi;
+} catch (error) {
+  console.warn(`Warning: Could not load math engine ABI: ${error.message}`);
+}
 
 // Helper functions
 function formatEther(value) {
