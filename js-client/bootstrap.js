@@ -64,6 +64,10 @@ async function bootstrap() {
     console.log(`  Token A: ${formatEther(balanceA)}`);
     console.log(`  Token B: ${formatEther(balanceB)}\n`);
 
+    const reserve0 = await basicAMM.reserve0();
+    const reserve1 = await basicAMM.reserve1();
+    console.log("Reserves:", reserve0.toString(), reserve1.toString());
+
     // Check if we have enough tokens
     const totalNeeded = CONFIG.INITIAL_LIQUIDITY.mul(2).add(
       CONFIG.TEST_TOKENS_PER_USER.mul(6)
@@ -117,7 +121,8 @@ async function bootstrap() {
       CONFIG.INITIAL_LIQUIDITY,
       0, // amount0Min
       0, // amount1Min
-      deployerAddress
+      deployerAddress,
+      { gasLimit: 500000 } // Explicit gas limit
     );
     const basicReceipt = await basicLiquidityTx.wait();
     console.log(`  TX Hash: ${basicReceipt.transactionHash}`);
@@ -135,7 +140,8 @@ async function bootstrap() {
       CONFIG.INITIAL_LIQUIDITY,
       0, // amount0Min
       0, // amount1Min
-      deployerAddress
+      deployerAddress,
+      { gasLimit: 500000 } // Explicit gas limit
     );
     const enhancedReceipt = await enhancedLiquidityTx.wait();
     console.log(`  TX Hash: ${enhancedReceipt.transactionHash}`);
